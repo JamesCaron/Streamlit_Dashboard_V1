@@ -36,7 +36,7 @@ st.markdown(
 st.title("E-Commerce Dashboard")
 
 # Load the data directly
-data_path = r'C:\Users\james\Documents\Data Projects\Streamlit hello world\ecommerce_data_updated.csv'
+data_path = "ecommerce_data_updated.csv"
 df = pd.read_csv(data_path)
 
 # Convert `Date` column to datetime and then to date
