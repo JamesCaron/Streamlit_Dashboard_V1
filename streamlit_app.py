@@ -92,35 +92,63 @@ elif time_range == "Last 7 Days":
     start_date = latest_date - timedelta(days=14)
     end_date = latest_date - timedelta(days=7)
 
+# Debug filtered data
+# st.write("Filtered Data (Selected Period):", filtered_df)
+
 # Filter the dataset for the previous period
 previous_period_df = df[(df["Date"] >= start_date) & (df["Date"] < end_date)]
+# st.write("Previous Period Data:", previous_period_df)
+
+# Metric-to-column mapping
+metric_to_column = {
+    "Total Sales": "Total_Sales_USD",
+    "Units Sold": "Total_Units_Sold",
+    "Profit": "Profit_USD",
+    "Profit Margin": None,  # Calculated separately
+    "Ad Spend": "Ad_Spend_USD",
+    "TACOS": "TACOS_Percent",
+    "% of Sales from Ads": "Percent_of_Sales_from_Ads",
+    "ACOS": "ACOS_Percent",
+}
 
 # Calculate account metrics for the selected period
 account_metrics = {
-    "Total Sales": filtered_df["Total_Sales_USD"].sum() if "Total_Sales_USD" in filtered_df else 0,
-    "Units Sold": filtered_df["Total_Units_Sold"].sum() if "Total_Units_Sold" in filtered_df else 0,
-    "Profit": filtered_df["Profit_USD"].sum() if "Profit_USD" in filtered_df else 0,
+    "Total Sales": filtered_df["Total_Sales_USD"].sum(),
+    "Units Sold": filtered_df["Total_Units_Sold"].sum(),
+    "Profit": filtered_df["Profit_USD"].sum(),
     "Profit Margin": round((filtered_df["Profit_USD"].sum() / filtered_df["Total_Sales_USD"].sum()) * 100, 2)
-    if "Total_Sales_USD" in filtered_df and filtered_df["Total_Sales_USD"].sum() > 0 else 0,
-    "Ad Spend": filtered_df["Ad_Spend_USD"].sum() if "Ad_Spend_USD" in filtered_df else 0,
-    "TACOS": round(filtered_df["TACOS_Percent"].mean(), 2) if "TACOS_Percent" in filtered_df else 0,
-    "% of Sales from Ads": round(filtered_df["Percent_of_Sales_from_Ads"].mean(), 2)
-    if "Percent_of_Sales_from_Ads" in filtered_df else 0,
-    "ACOS": round(filtered_df["ACOS_Percent"].mean(), 2) if "ACOS_Percent" in filtered_df else 0,
+    if filtered_df["Total_Sales_USD"].sum() > 0 else 0,
+    "Ad Spend": filtered_df["Ad_Spend_USD"].sum(),
+    "TACOS": round(filtered_df["TACOS_Percent"].mean(), 2),
+    "% of Sales from Ads": round(filtered_df["Percent_of_Sales_from_Ads"].mean(), 2),
+    "ACOS": round(filtered_df["ACOS_Percent"].mean(), 2),
 }
 
 # Calculate percentage changes for the selected time range
 changes = {}
 for metric, value in account_metrics.items():
-    col_name = metric.replace(" ", "_").replace("%", "Percent")
-    if col_name and col_name in previous_period_df.columns:
-        prev_value = previous_period_df[col_name].sum()
-        if prev_value > 0:
-            changes[metric] = round(((value - prev_value) / prev_value) * 100, 2)
+    col_name = metric_to_column.get(metric)
+    if metric == "Profit Margin":
+        # Special handling for derived metric
+        if "Total_Sales_USD" in previous_period_df and previous_period_df["Total_Sales_USD"].sum() > 0:
+            prev_value = round(
+                (previous_period_df["Profit_USD"].sum() / previous_period_df["Total_Sales_USD"].sum()) * 100, 2
+            )
         else:
-            changes[metric] = 0  # Avoid division by zero
+            prev_value = 0
+    elif col_name and col_name in previous_period_df.columns:
+        prev_value = previous_period_df[col_name].sum()
     else:
-        changes[metric] = 0  # If column is missing, default to 0%
+        prev_value = None  # Column missing or invalid
+
+    # Calculate percent change
+    if prev_value is not None and prev_value > 0:
+        changes[metric] = round(((value - prev_value) / prev_value) * 100, 2)
+    else:
+        changes[metric] = "N/A"
+
+# Debugging changes
+# st.write("Percent Changes:", changes)
 
 # Display account metrics with percentage changes
 st.subheader(f"Account Metrics for the Last {comparison_period}")
@@ -131,7 +159,7 @@ for i in range(0, len(metrics), 4):  # Keep 4 columns per row
         delta_color = "inverse" if metric in ["TACOS", "% of Sales from Ads", "ACOS"] else "normal"
         display_value = format_value(value, metric)
         change = changes.get(metric, 0)
-        change_text = f"{change:+}%" if change != 0 else "0%"
+        change_text = f"{change:+}%" if isinstance(change, (int, float)) else change
         col.metric(metric, display_value, change_text, delta_color=delta_color)
 
 # Dropdown for SKU selection (one selection box for both graph and table)
